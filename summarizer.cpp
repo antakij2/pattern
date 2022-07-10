@@ -74,34 +74,54 @@ void Summarizer::insertInNextColumn(const std::u32string& str, const size_t firs
 
 Summarizer::TranscoderNormalizer::TranscoderNormalizer(const char* fromcode) :
 	fromcode(fromcode),
-	first(new char[UTF8_FILENAME_MAX]),
-	second(new char[UTF8_FILENAME_MAX]) 
+	first(UTF8_FILENAME_MAX),
+	second(UTF8_FILENAME_MAX) 
 {}
 
-const char* Summarizer::TranscoderNormalizer::transcode_normalize(const char* filename)
+const char* Summarizer::TranscoderNormalizer::decode_normalize(const char* filename)
 {
 	uint8_t* result;
 
-	result = u8_conv_from_encoding(fromcode, iconveh_escape_sequence, filename, strlen(filename), /*TODO: if comes from a std::string, use that property */ NULL, first.get(), 
+	result = u8_conv_from_encoding(fromcode, iconveh_escape_sequence, filename, strlen(filename) + 1, /*TODO: or std::string.size() */ NULL, first.getWritableString(), first.giveCapacityGetStrlen());
+	checkResult(result, first);
+
+	result = u8_normalize(UNINORM_NFC, first.getWritableString(), first.getStrlen(), second.getWritableString(), second.giveCapacityGetStrlen());
+	checkResult(result, second);
+
+	return result;
 }
 
+void Summarizer::TranscoderNormalizer::checkResult(uint8_t* result, SmartUTF8String& smartString)
+{
+	if(result != smartString.getWritableString())
+	{
+		throwIfError(result);
+		smartString.reset(result);
+	}
+}
 
 Summarizer::TranscoderNormalizer::SmartUTF8String::SmartUTF8String(size_t _capacity) :
 	strlen(0),
-	capacity(_capacity)
+	capacity(_capacity),
+	capacityPointer(&capacity)
 
 {
 	string = (uint8_t*) malloc(sizeof(*string) * _capacity);
-	throwIfMallocFailed(string);
+	throwIfError(string);
 	string[0] = '\0';
 }
 
-void Summarizer::TranscoderNormalizer::SmartUTF8String::reset(uint8_t* other, size_t otherStrlen, size_t otherCapacity)
+void Summarizer::TranscoderNormalizer::SmartUTF8String::reset(uint8_t* other)
 {
 	free(string);
 	string = other;
-	strlen = otherStrlen;
-	capacity = otherCapacity;
+	capacity = strlen;
+}
+
+size_t* Summarizer::TranscoderNormalizer::SmartUTF8String::giveCapacityGetStrlen()
+{
+	strlen = capacity;
+	return strlenPointer;
 }
 
 Summarizer::TranscoderNormalizer::SmartUTF8String::~SmartUTF8String()
