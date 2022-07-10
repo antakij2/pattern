@@ -15,11 +15,13 @@
 #include <unigbrk.h>
 #include "summarizer.hpp"
 
-Summarizer::Summarizer(std::unordered_set<char32_t>& _delimiters) :
+Summarizer::Summarizer(char* _delimiters) :
 			greatestCommonChunkIndex(SIZE_MAX),
 			patternIndex(0),
-			delimiters(std::move(_delimiters))
-			{}
+			filenameProcessor(StringIngester)
+{
+
+}
 
 //TODO: create string out of each chunk examined, and check for membership in delimiters set
 void Summarizer::inputFilename(std::u32string& filename)
@@ -76,13 +78,15 @@ void Summarizer::insertInNextColumn(const std::u32string& str, const size_t firs
 }
 
 
-Summarizer::FilenameProcessor::FilenameProcessor(const char* fromcode) :
-	fromcode(fromcode),
+Summarizer::StringIngester::StringIngester() :
 	first(UTF8_FILENAME_MAX),
 	second(UTF8_FILENAME_MAX) 
-{}
+{
+	setlocale(LC_ALL, "");
+	fromcode = locale_charset();
+}
 
-void Summarizer::FilenameProcessor::processFilename(const char* filename)
+void Summarizer::StringIngester::ingestString(const char* filename)
 {
 	uint8_t* result;
 
@@ -101,7 +105,7 @@ void Summarizer::FilenameProcessor::processFilename(const char* filename)
 	u8_grapheme_breaks(second.string, second.getStrlen(), (char*) first.string);
 }
 
-void Summarizer::FilenameProcessor::checkResult(uint8_t* result, SmartUTF8String& smartString)
+void Summarizer::StringIngester::checkResult(uint8_t* result, SmartUTF8String& smartString)
 {
 	if(result != smartString.string)
 	{
@@ -110,7 +114,7 @@ void Summarizer::FilenameProcessor::checkResult(uint8_t* result, SmartUTF8String
 	}
 }
 
-Summarizer::FilenameProcessor::SmartUTF8String::SmartUTF8String(size_t _capacity) :
+Summarizer::StringIngester::SmartUTF8String::SmartUTF8String(size_t _capacity) :
 	strlen(0),
 	capacity(_capacity),
 	strlenPointer(&strlen)
@@ -120,20 +124,20 @@ Summarizer::FilenameProcessor::SmartUTF8String::SmartUTF8String(size_t _capacity
 	throwIfError(string);
 }
 
-void Summarizer::FilenameProcessor::SmartUTF8String::reset(uint8_t* other)
+void Summarizer::StringIngester::SmartUTF8String::reset(uint8_t* other)
 {
 	free(string);
 	string = other;
 	capacity = strlen;
 }
 
-size_t* Summarizer::FilenameProcessor::SmartUTF8String::giveCapacityGetStrlen()
+size_t* Summarizer::StringIngester::SmartUTF8String::giveCapacityGetStrlen()
 {
 	strlen = capacity;
 	return strlenPointer;
 }
 
-Summarizer::FilenameProcessor::SmartUTF8String::~SmartUTF8String()
+Summarizer::StringIngester::SmartUTF8String::~SmartUTF8String()
 {
 	free(string);	
 }

@@ -1,4 +1,3 @@
-#include <clocale>
 #include <cstdlib>
 #include <iostream>
 #include <unistd.h>
@@ -32,8 +31,6 @@ const uint8_t* convertEncodingIfNecessary(const char* fromcode, const char* sour
 //TODO: use u8_conv_from_encoding if source encoding isn't "UTF-8", and make resultbuf an existing buffer (gotta do strlen tho and feed that in too). \uxxx if untranslatable character?
 int main(int argc, char* argv[])
 {
-	setlocale(LC_ALL, "");
-
 	int option;
 	while((option = getopt(argc, argv, "rd:")) != -1) 
 	{
@@ -41,7 +38,7 @@ int main(int argc, char* argv[])
 		{
 			case 'r':
 				break;
-			case 'd':
+			case 'd': 
 				//TODO: pointer to argument in optarg
 				break;
 			default:

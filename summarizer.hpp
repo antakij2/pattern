@@ -1,4 +1,3 @@
-#include <cuchar>
 #include <climits>
 #include <cstddef>
 #include <vector>
@@ -12,25 +11,26 @@
 class Summarizer
 {
 	public:
-		Summarizer(std::unordered_set<char32_t>&); 
+		Summarizer(char*); 
 		void inputFilename(std::u32string&);
 		//TODO: function to supply output strings
 	private:
 		size_t greatestCommonChunkIndex;
 		size_t patternIndex; 
-		const std::unordered_set<char32_t> delimiters;
-		std::vector<std::set<std::u32string>> pattern; //TODO: create custom comparison object for this
+		const std::unordered_set<std::basic_string<uint8_t>> delimiters;
+		std::vector<std::set<std::basic_string<uint8_t>>> pattern; //TODO: create custom comparison object for this
+		StringIngester filenameProcessor;
 
 		void insertSubstringInNextColumn(const std::u32string&, size_t&, size_t&);
 
-		class FilenameProcessor
+		class StringIngester
 		{
 			public:
-				FilenameProcessor(const char*);
-				void processFilename(char*);
+				StringIngester();
+				void ingestString(char*);
 				const uint8_t* getGraphemeBreaks() { return first.string; }
-				const uint8_t* getProcessedFilename() { return second.string; }
-				size_t getProcessedFilenameLength() { return second.getStrlen(); }
+				const uint8_t* getProcessedString() { return second.string; }
+				size_t getProcessedStringLength() { return second.getStrlen(); }
 			private:
 				// estimated maximum length of a POSIX filename transcoded to UTF-8, since UTF-8 characters are 1-4 bytes long
 				static const size_t UTF8_FILENAME_MAX = FILENAME_MAX * 4; 
