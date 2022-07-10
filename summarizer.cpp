@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <uniconv.h>
+#include <uninorm.h>
+#include <unigbrk.h>
 #include "summarizer.hpp"
 
 Summarizer::Summarizer(std::unordered_set<char32_t>& _delimiters) :
@@ -22,6 +24,8 @@ Summarizer::Summarizer(std::unordered_set<char32_t>& _delimiters) :
 //TODO: create string out of each chunk examined, and check for membership in delimiters set
 void Summarizer::inputFilename(std::u32string& filename)
 {
+	//TODO: just declare the processed filename and the grapheme boundary arrays in const variables up here
+	
 	patternIndex = 0;
 	size_t first = 0;
 	size_t last = 1;
@@ -72,59 +76,64 @@ void Summarizer::insertInNextColumn(const std::u32string& str, const size_t firs
 }
 
 
-Summarizer::TranscoderNormalizer::TranscoderNormalizer(const char* fromcode) :
+Summarizer::FilenameProcessor::FilenameProcessor(const char* fromcode) :
 	fromcode(fromcode),
 	first(UTF8_FILENAME_MAX),
 	second(UTF8_FILENAME_MAX) 
 {}
 
-const char* Summarizer::TranscoderNormalizer::decode_normalize(const char* filename)
+void Summarizer::FilenameProcessor::processFilename(const char* filename)
 {
 	uint8_t* result;
 
-	result = u8_conv_from_encoding(fromcode, iconveh_escape_sequence, filename, strlen(filename) + 1, /*TODO: or std::string.size() */ NULL, first.getWritableString(), first.giveCapacityGetStrlen());
+	result = u8_conv_from_encoding(fromcode, iconveh_question_mark, filename, strlen(filename), /*TODO: or std::string.size() */ NULL, first.string, first.giveCapacityGetStrlen());
 	checkResult(result, first);
 
-	result = u8_normalize(UNINORM_NFC, first.getWritableString(), first.getStrlen(), second.getWritableString(), second.giveCapacityGetStrlen());
+	result = u8_normalize(UNINORM_NFC, first.string, first.getStrlen(), second.string, second.giveCapacityGetStrlen());
 	checkResult(result, second);
 
-	return result;
+	*(first.giveCapacityGetStrlen()) = second.getStrlen();
+	if(first.getCapacity() < second.getStrlen())
+	{
+		result = malloc(sizeof(*(first.string)) * second.getStrlen());
+		checkResult(result, first);
+	}
+	u8_grapheme_breaks(second.string, second.getStrlen(), (char*) first.string);
 }
 
-void Summarizer::TranscoderNormalizer::checkResult(uint8_t* result, SmartUTF8String& smartString)
+void Summarizer::FilenameProcessor::checkResult(uint8_t* result, SmartUTF8String& smartString)
 {
-	if(result != smartString.getWritableString())
+	if(result != smartString.string)
 	{
 		throwIfError(result);
 		smartString.reset(result);
 	}
 }
 
-Summarizer::TranscoderNormalizer::SmartUTF8String::SmartUTF8String(size_t _capacity) :
+Summarizer::FilenameProcessor::SmartUTF8String::SmartUTF8String(size_t _capacity) :
 	strlen(0),
 	capacity(_capacity),
-	capacityPointer(&capacity)
+	strlenPointer(&strlen)
 
 {
 	string = (uint8_t*) malloc(sizeof(*string) * _capacity);
 	throwIfError(string);
-	string[0] = '\0';
 }
 
-void Summarizer::TranscoderNormalizer::SmartUTF8String::reset(uint8_t* other)
+void Summarizer::FilenameProcessor::SmartUTF8String::reset(uint8_t* other)
 {
 	free(string);
 	string = other;
 	capacity = strlen;
 }
 
-size_t* Summarizer::TranscoderNormalizer::SmartUTF8String::giveCapacityGetStrlen()
+size_t* Summarizer::FilenameProcessor::SmartUTF8String::giveCapacityGetStrlen()
 {
 	strlen = capacity;
 	return strlenPointer;
 }
 
-Summarizer::TranscoderNormalizer::SmartUTF8String::~SmartUTF8String()
+Summarizer::FilenameProcessor::SmartUTF8String::~SmartUTF8String()
 {
 	free(string);	
 }

@@ -12,7 +12,7 @@
 class Summarizer
 {
 	public:
-		Summarizer(std::unordered_set<char32_t>&); //TODO: in main, do wchars need to be explicitly cast to char32_t, or must I use c++14 to get implicit conversion?
+		Summarizer(std::unordered_set<char32_t>&); 
 		void inputFilename(std::u32string&);
 		//TODO: function to supply output strings
 	private:
@@ -23,11 +23,14 @@ class Summarizer
 
 		void insertSubstringInNextColumn(const std::u32string&, size_t&, size_t&);
 
-		class TranscoderNormalizer
+		class FilenameProcessor
 		{
 			public:
-				TranscoderNormalizer(const char*);
-				const char* decode_normalize(char*);
+				FilenameProcessor(const char*);
+				void processFilename(char*);
+				const uint8_t* getGraphemeBreaks() { return first.string; }
+				const uint8_t* getProcessedFilename() { return second.string; }
+				size_t getProcessedFilenameLength() { return second.getStrlen(); }
 			private:
 				// estimated maximum length of a POSIX filename transcoded to UTF-8, since UTF-8 characters are 1-4 bytes long
 				static const size_t UTF8_FILENAME_MAX = FILENAME_MAX * 4; 
@@ -38,17 +41,19 @@ class Summarizer
 
 				void checkResult(uint8_t*, SmartUTF8String&);
 
-				class SmartUTF8String
+				class SmartUTF8String /* Contains a raw char array, without a NUL termination byte. */
 				{
 					public:
+						uint8_t string[]; 
+
 						SmartUTF8String(size_t);
 						~SmartUTF8String();
-						uint8_t* getWritableString() { return string; } 
+						size_t getCapacity() { return capacity; }
+						size_t getStrlen() { return strlen; }
 						size_t* giveCapacityGetStrlen();
 						void reset(uint8_t*);
 					private:
-						uint8_t string[];
-						size_t strlen; /* This length includes the NUL termination byte. */
+						size_t strlen; 
 						size_t capacity;
 						size_t* strlenPointer;
 
