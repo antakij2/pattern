@@ -13,22 +13,7 @@ void printErrorAndExit(char** argv)
 	exit(EXIT_FAILURE);
 }
 
-// If "fromcode" is not already UTF-8, convert "source" from "fromcode" to UTF-8. Store result in "result"
-const uint8_t* convertEncodingIfNecessary(const char* fromcode, const char* source, size_t sourceLength, uint8_t** result, size_t* resultLength)
-{
-	if(!strcmp(fromcode, UTF8))
-	{
-		return (const uint8_t*)source;
-	}
-
-	uint8_t* newResult = u8_conv_from_encoding(fromcode, iconveh_escape_sequence, source, sourceLength, NULL, result, resultLength); //TODO: undocumented iconveh_replacement_character?
-	if(newResult != result)
-	{
-		free(*result);
-		*result = newResult;
-}
-
-//TODO: use u8_conv_from_encoding if source encoding isn't "UTF-8", and make resultbuf an existing buffer (gotta do strlen tho and feed that in too). \uxxx if untranslatable character?
+//TODO: check for empty strings in stdin input, and don't process them
 int main(int argc, char* argv[])
 {
 	int option;
@@ -55,6 +40,4 @@ int main(int argc, char* argv[])
 		}
 		//TODO: handle stdin
 	}
-
-	
 }

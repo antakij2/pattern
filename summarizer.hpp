@@ -4,31 +4,36 @@
 #include <set>
 #include <unordered_set>
 #include <string>
+#include <unitypes.h>
 
 #ifndef SUMMARIZER_H
 #define SUMMARIZER_H
 
+typedef std::basic_string<uint8_t> uint8_string;
+
+//TODO: make seperate headers for nested classes, give them private constructors, and put "friend StringIngester" in SmartUTF8String, and "friend Summarizer" in StringIngester, so they can be instantiated by those classes?
+
 class Summarizer
 {
 	public:
-		Summarizer(char*); 
-		void inputFilename(std::u32string&);
+		Summarizer(const char*); 
+		void inputFilename(const char*);
 		//TODO: function to supply output strings
 	private:
 		size_t greatestCommonChunkIndex;
 		size_t patternIndex; 
-		const std::unordered_set<std::basic_string<uint8_t>> delimiters;
-		std::vector<std::set<std::basic_string<uint8_t>>> pattern; //TODO: create custom comparison object for this
-		StringIngester filenameProcessor;
+		const std::unordered_set<uint8_string> delimiters;
+		std::vector<std::set<uint8_string>> pattern; //TODO: create custom comparison object for this
+		uint8_string scratch;
 
-		void insertSubstringInNextColumn(const std::u32string&, size_t&, size_t&);
+		void insertSubstringInNextColumn(const uint8_t*, size_t, size_t);
 
 		class StringIngester
 		{
 			public:
 				StringIngester();
 				void ingestString(char*);
-				const uint8_t* getGraphemeBreaks() { return first.string; }
+				const uint8_t* getGraphemeClusterBreaks() { return first.string; }
 				const uint8_t* getProcessedString() { return second.string; }
 				size_t getProcessedStringLength() { return second.getStrlen(); }
 			private:
@@ -36,8 +41,6 @@ class Summarizer
 				static const size_t UTF8_FILENAME_MAX = FILENAME_MAX * 4; 
 
 				const char* fromcode;
-				SmartUTF8String first;
-				SmartUTF8String second;
 
 				void checkResult(uint8_t*, SmartUTF8String&);
 
@@ -63,7 +66,12 @@ class Summarizer
 																    // (after final output, have a comma-delimlited list of
 																    // "these filenames could not be processed:"
 				};
+
+				SmartUTF8String first;
+				SmartUTF8String second;
 		};
+
+		StringIngester stringIngester;
 };
 
 #endif /* SUMMARIZER_H */
