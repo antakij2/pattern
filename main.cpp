@@ -1,43 +1,62 @@
 #include <cstdlib>
-#include <iostream>
+#include <cstdio>
 #include <unistd.h>
+#include <dirent.h>
 #include "summarizer.hpp"
 
-const char* UTF8 = "UTF-8";
-
-//TODO: unsync iostream with underlying stuff so its faster, or use (f)printf
-void printErrorAndExit(char** argv)
+void printUsageAndExit(char** argv)
 {
-	std::cerr << "Usage: " << argv[0] << " [-d delimiters] [-r] directory" << std::endl;
-	std::cerr << "Or try '" << argv[0] << " -h' for more information." << std::endl; 
-	exit(EXIT_FAILURE);
+	std::fprintf(stderr, "Usage: %s [-d delimiters] [-r] directory\n", argv[0]);
+	std::fprintf(stderr, "Or try '%s -h' for more information.\n", argv[0]); 
+	std::exit(EXIT_FAILURE);
 }
 
 //TODO: check for empty strings in stdin input, and don't process them
 int main(int argc, char* argv[])
 {
 	int option;
+	char* delimiters;
 	while((option = getopt(argc, argv, "rd:")) != -1) 
 	{
 		switch(option) 
 		{
 			case 'r':
+				//TODO
 				break;
 			case 'd': 
-				//TODO: pointer to argument in optarg
+				delimiters = optarg; //TODO: i think this is safe, even if the arguments get permuted???
 				break;
 			default:
-				printErrorAndExit(argv);
+				printUsageAndExit(argv);
 		}
 	}
+
+	Summarizer summarizer(delimiters);
 
 	if(optind >= argc)
 	{
 		// no directory given as an argument, so check for a list of filenames from stdin
 		if(isatty(STDIN_FILENO))
 		{
-			printErrorAndExit(argv);
+			printUsageAndExit(argv);
 		}
 		//TODO: handle stdin
+	}
+	else
+	{
+		DIR* dir = opendir(argv[optind]);
+		if(dir == NULL)
+		{
+			std::perror(NULL);
+			std::exit(EXIT_FAILURE);
+		}
+
+		struct dirent* ent;
+		while((ent = readdir(dir)) != NULL)
+		{
+			summarizer.inputFilename(ent -> d_name);
+		}
+
+		closedir(dir);
 	}
 }

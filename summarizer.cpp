@@ -1,20 +1,25 @@
 #include <clocale>
 #include <cstdlib>
-#include <stdexcept>
+#include <cstdio>
+#include <climits>
 #include <uniconv.h>
 #include <uninorm.h>
 #include <unigbrk.h>
 #include "summarizer.hpp"
 
-Summarizer::Summarizer(const char* _delimiters) :
-			greatestCommonChunkIndex(SIZE_MAX),
-			patternIndex(0)
+Summarizer::Summarizer(const char* _delimiters, size_t rowLimit) :
+			greatestCommonChunkIndex(std::SIZE_MAX),
+			patternIndex(0),
+			rowLimit(rowLimit)
 {
+	std::setlocale(LC_ALL, "");
+        localeCode = locale_charset();
+
 	//TODO: maybe make this some method that's also called in inputFilename
-	stringIngester.ingestString(_delimiters);
-	const uint8_t* graphemeBreaks = stringIngester.getGraphemeClusterBreaks();
-        const uint8_t* processedDelimiters = stringIngester.getProcessedString();
-        size_t processedDelimitersLength = stringIngester.getProcessedStringLength();
+	ingestString(_delimiters);
+	const uint8_t* graphemeBreaks = getGraphemeClusterBreaks();
+        const uint8_t* processedDelimiters = getProcessedString();
+        size_t processedDelimitersLength = getProcessedStringLength();
 
 	size_t first = 0;
 	size_t last = 1;
@@ -33,10 +38,10 @@ Summarizer::Summarizer(const char* _delimiters) :
 
 void Summarizer::inputFilename(const char* filename)
 {
-	stringIngester.ingestString(filename);
-	const uint8_t* graphemeBreaks = stringIngester.getGraphemeClusterBreaks();
-	const uint8_t* processedFilename = stringIngester.getProcessedString();
-	size_t processedFilenameLength = stringIngester.getProcessedStringLength();
+	ingestString(filename);
+	const uint8_t* graphemeBreaks = getGraphemeClusterBreaks();
+	const uint8_t* processedFilename = getProcessedString();
+	size_t processedFilenameLength = getProcessedStringLength();
 
 	patternIndex = 0;
 	size_t first = 0;
@@ -74,6 +79,46 @@ void Summarizer::inputFilename(const char* filename)
 	}
 }
 
+void Summarizer::printSummary()
+{
+
+}
+
+void Summarizer::ingestString(const char* filename)
+{
+	uint8_t* result;
+
+	result = u8_conv_from_encoding(localeCode, iconveh_question_mark, filename, strlen(filename), NULL, first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), first.giveCapacityGetStrlen());
+	checkResult(result, first);
+
+	result = u8_normalize(UNINORM_NFC, first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), first.getStrlen(), second.getWriteableStringDoesNotUpdateStrlenOrCapacity(), second.giveCapacityGetStrlen());
+	checkResult(result, second);
+
+	size_t secondStrlen = second.getStrlen();
+	*(first.giveCapacityGetStrlen()) = secondStrlen;
+	if(first.getCapacity() < secondStrlen)
+	{
+		result = std::malloc(sizeof(*(first.getWriteableStringDoesNotUpdateStrlenOrCapacity())) * secondStrlen);
+		checkResult(result, first);
+	}
+	u8_grapheme_breaks(second.getWriteableStringDoesNotUpdateStrlenOrCapacity(), secondStrlen, (char*) first.getWriteableStringDoesNotUpdateStrlenOrCapacity()); 
+}
+
+void Summarizer::checkResult(uint8_t* result, SmartUTF8String& smartString)
+{
+	if(result != smartString.getWriteableStringDoesNotUpdateStrlenOrCapacity())
+	{
+		//TODO: add filename logging for non-malloc errors, so can print "these filenames could not be processed:" at end
+		if(ptr == NULL)
+		{
+			std::perror(NULL);
+			std::exit(EXIT_FAILURE);
+		}
+
+		smartString.reset(result);
+	}
+}
+
 void Summarizer::insertInNextColumn(const uint8_t* str, size_t start, size_t end)
 {
 	if(pattern.size == patternIndex)
@@ -85,68 +130,34 @@ void Summarizer::insertInNextColumn(const uint8_t* str, size_t start, size_t end
 	pattern[patternIndex++].emplace(str + start, start - end);
 }
 
-
-Summarizer::StringIngester::StringIngester() :
-	first(UTF8_FILENAME_MAX),
-	second(UTF8_FILENAME_MAX) 
-{
-	setlocale(LC_ALL, "");
-	fromcode = locale_charset();
-}
-
-void Summarizer::StringIngester::ingestString(const char* filename)
-{
-	uint8_t* result;
-
-	result = u8_conv_from_encoding(fromcode, iconveh_question_mark, filename, strlen(filename), NULL, first.string, first.giveCapacityGetStrlen());
-	checkResult(result, first);
-
-	result = u8_normalize(UNINORM_NFC, first.string, first.getStrlen(), second.string, second.giveCapacityGetStrlen());
-	checkResult(result, second);
-
-	size_t secondStrlen = second.getStrlen();
-	*(first.giveCapacityGetStrlen()) = secondStrlen;
-	if(first.getCapacity() < secondStrlen)
-	{
-		result = malloc(sizeof(*(first.string)) * secondStrlen);
-		checkResult(result, first);
-	}
-	u8_grapheme_breaks(second.string, secondStrlen, (char*) first.string); //TODO: do we need the char* cast for first.string?
-}
-
-void Summarizer::StringIngester::checkResult(uint8_t* result, SmartUTF8String& smartString)
-{
-	if(result != smartString.string)
-	{
-		throwIfError(result);
-		smartString.reset(result);
-	}
-}
-
-Summarizer::StringIngester::SmartUTF8String::SmartUTF8String(size_t _capacity) :
+Summarizer::SmartUTF8String::SmartUTF8String() :
 	strlen(0),
-	capacity(_capacity),
+	capacity(UTF8_FILENAME_MAX),
 	strlenPointer(&strlen)
 
 {
-	string = (uint8_t*) malloc(sizeof(*string) * _capacity);
-	throwIfError(string);
+	string = (uint8_t*) std::malloc(sizeof(*string) * capacity);
+	if(ptr == NULL)
+        {
+                std::perror(NULL);
+                std::exit(EXIT_FAILURE);
+        }
 }
 
-void Summarizer::StringIngester::SmartUTF8String::reset(uint8_t* other)
-{
-	free(string);
-	string = other;
-	capacity = strlen;
-}
-
-size_t* Summarizer::StringIngester::SmartUTF8String::giveCapacityGetStrlen()
+size_t* Summarizer::SmartUTF8String::giveCapacityGetStrlen()
 {
 	strlen = capacity;
 	return strlenPointer;
 }
 
-Summarizer::StringIngester::SmartUTF8String::~SmartUTF8String()
+void Summarizer::SmartUTF8String::reset(uint8_t* other)
 {
-	free(string);	
+	std::free(string);
+	string = other;
+	capacity = strlen;
+}
+
+Summarizer::SmartUTF8String::~SmartUTF8String()
+{
+	std::free(string);	
 }
