@@ -1,5 +1,6 @@
 #include <climits>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 #include <set>
 #include <unordered_set>
@@ -9,51 +10,62 @@
 #ifndef SUMMARIZER_H
 #define SUMMARIZER_H
 
-typedef std::basic_string<uint8_t> uint8_string;
-
 class Summarizer
 {
 	public:
-		Summarizer(const char*, size_t); 
+		Summarizer(const char*, int);
 		void inputFilename(const char*);
 		void printSummary();
 	private:
-		class SmartUTF8String /* Contains a raw char array, without a NUL termination byte. */
+		typedef std::basic_string<uint8_t> uint8_string;
+
+		class SmartUTF8Buffer /* Contains a raw char array, without a NUL termination byte. */
 		{
 			public:
-				SmartUTF8String(size_t);
+				SmartUTF8Buffer(std::size_t);
 				uint8_t* getWriteableStringDoesNotUpdateStrlenOrCapacity() { return string; }
-				size_t getCapacity() { return capacity; }
-				size_t getStrlen() { return strlen; }
-				size_t* giveCapacityGetStrlen();
-				void reset(uint8_t*);
-				~SmartUTF8String();
+				std::size_t getCapacity() { return capacity; }
+				std::size_t getStrlen() { return strlen; }
+				std::size_t* giveCapacityGetStrlen();
+				void reset(const uint8_t*);
+				~SmartUTF8Buffer();
 			private:
 				// estimated maximum length of a POSIX filename transcoded to UTF-8, since UTF-8 characters are 1-4 bytes long
-				static const size_t UTF8_FILENAME_MAX = std::FILENAME_MAX * 4;
+				static const std::size_t UTF8_FILENAME_MAX = FILENAME_MAX * 4;
 
 				uint8_t* string; 
-				size_t strlen; 
-				size_t capacity;
-				size_t* strlenPointer;
+				std::size_t strlen; 
+				std::size_t capacity;
+				std::size_t* strlenPointer;
 		};
 
-		size_t greatestCommonChunkIndex;
-		size_t patternIndex; 
-		size_t rowLimit;
+		struct GraphemeClusterString
+		{
+			GraphemeClusterString(const char*, std::size_t, std::size_t); 
+
+			const uint8_string string;
+			const std::size_t graphemeClusterCount;
+		};
+
+		static constexpr auto graphemeClusterStringComp = [](const GraphemeClusterString& lhs, const GraphemeClusterString& rhs) { return lhs.string < rhs.string; };
+
+		std::size_t greatestCommonChunkIndex;
+		std::size_t patternIndex; 
+		int colLimit;
 		const std::unordered_set<uint8_string> delimiters;
-		std::vector<std::set<uint8_string>> pattern; 
+		std::vector<std::set<GraphemeClusterString, decltype(graphemeClusterStringComp)>> pattern; 
+		std::vector<std::size_t> highestGraphemeClusterCounts;
 		uint8_string scratch;
 		const char* localeCode;
-		SmartUTF8String first;
-		SmartUTF8String second;
+		SmartUTF8Buffer first; //FIXME: rename to be more descriptive, also "first"
+		SmartUTF8Buffer second; // is shadowed by some local variables in methods
 
 		void ingestString(char*);
-		const uint8_t* getGraphemeClusterBreaks() { return first.getWriteableStringDoesNotUpdateStrlenOrCapacity(); }
-		const uint8_t* getProcessedString() { return second.getWriteableStringDoesNotUpdateStrlenOrCapacity(); }
-		size_t getProcessedStringLength() { return second.getStrlen(); }
-		void checkResult(uint8_t*, SmartUTF8String&);
-		void insertSubstringInNextColumn(const uint8_t*, size_t, size_t);
+		const uint8_t* getGraphemeClusterBreaks() { return first.getWriteableStringDoesNotUpdateStrlenOrCapacity(); } //TODO: get rid of these, just access "first" and "second" directly. During printSummary, they 
+		const uint8_t* getProcessedString() { return second.getWriteableStringDoesNotUpdateStrlenOrCapacity(); }      // are not grapheme cluster breaks + the corresponding processed string 
+		std::size_t getProcessedStringLength() { return second.getStrlen(); }					      // anymore
+		void checkResult(const uint8_t*, SmartUTF8Buffer&);
+		void insertInNextColumn(const uint8_t*, std::size_t, std::size_t, std::size_t);
 };
 
 #endif /* SUMMARIZER_H */

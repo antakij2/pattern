@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include "summarizer.hpp"
@@ -15,7 +16,7 @@ void printUsageAndExit(char** argv)
 int main(int argc, char* argv[])
 {
 	int option;
-	char* delimiters;
+	char* delimiters = NULL;
 	while((option = getopt(argc, argv, "rd:")) != -1) 
 	{
 		switch(option) 
@@ -24,14 +25,16 @@ int main(int argc, char* argv[])
 				//TODO
 				break;
 			case 'd': 
-				delimiters = optarg; //TODO: i think this is safe, even if the arguments get permuted???
+				delimiters = optarg; //TODO: i think this is safe, even if the arguments get permuted??? 
 				break;
 			default:
 				printUsageAndExit(argv);
 		}
 	}
 
-	Summarizer summarizer(delimiters);
+	struct winsize w;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+	Summarizer summarizer(delimiters, (int) w.ws_col);
 
 	if(optind >= argc)
 	{
@@ -59,4 +62,6 @@ int main(int argc, char* argv[])
 
 		closedir(dir);
 	}
+
+	summarizer.printSummary();
 }
