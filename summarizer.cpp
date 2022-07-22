@@ -7,13 +7,13 @@
 #include <unigbrk.h>
 #include "summarizer.hpp"
 
-Summarizer::Summarizer(const char* _delimiters, int colLimit) :
+Summarizer::Summarizer(const char* _delimiters, std::size_t colLimit) :
 			greatestCommonChunkIndex(SIZE_MAX),
 			patternIndex(0),
 			colLimit(colLimit)
 {
 	std::setlocale(LC_ALL, "");
-        localeCode = locale_charset();
+    localeCode = locale_charset();
 
 	if(_delimiters != NULL)
 	{
@@ -131,13 +131,13 @@ void Summarizer::printSummary()
 
 				outputRowIterator -> append(charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
                                             charBuffer.getStringLength());
-				outputRowIterator -> append(' ', highestGraphemeClusterCounts[i] - (chunkIterator -> graphemeClusterCount));
+				outputRowIterator -> append(highestGraphemeClusterCounts[i] - (chunkIterator -> graphemeClusterCount), ' ');
 
 				++chunkIterator;
 			}
 			else
 			{
-				outputRowIterator -> append(' ', highestGraphemeClusterCounts[i]);
+				outputRowIterator -> append(highestGraphemeClusterCounts[i], ' ');
 			}
 
 			if(i != patternSize - 1)
@@ -160,7 +160,7 @@ void Summarizer::ingestString(const char* filename)
 {
 	uint8_t* result;
 
-	result = u8_conv_from_encoding(localeCode, iconveh_question_mark, filename, strlen(filename), NULL,
+	result = u8_conv_from_encoding(localeCode, iconveh_question_mark, filename, std::strlen(filename), NULL,
                                    _utf8BufferInner.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
                                    _utf8BufferInner.giveCapacityGetStringLength());
 	checkResult(result, _utf8BufferInner);
@@ -219,22 +219,22 @@ template <class T>
 Summarizer::SmartBuffer<T>::SmartBuffer() :
         stringLength(0),
         capacity(UTF8_FILENAME_MAX),
-        strlenPointer(&stringLength)
+        stringLengthPointer(&stringLength)
 
 {
 	string = (T*) std::malloc(sizeof(*string) * capacity);
-	if(ptr == NULL)
-        {
-                std::perror(NULL);
-                std::exit(EXIT_FAILURE);
-        }
+	if(string == NULL)
+    {
+        std::perror(NULL);
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 template <class T>
 std::size_t* Summarizer::SmartBuffer<T>::giveCapacityGetStringLength()
 {
     stringLength = capacity;
-	return strlenPointer;
+	return stringLengthPointer;
 }
 
 template <class T>
@@ -251,7 +251,7 @@ Summarizer::SmartBuffer<T>::~SmartBuffer()
 	std::free(string);	
 }
 
-Summarizer::GraphemeClusterString::GraphemeClusterString(const char* s, std::size_t n, std::size_t graphemeClusterCount) :
+Summarizer::GraphemeClusterString::GraphemeClusterString(const uint8_t* s, std::size_t n, std::size_t graphemeClusterCount) :
 	string(s, n),
 	graphemeClusterCount(graphemeClusterCount)
 {}

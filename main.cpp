@@ -32,10 +32,10 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	struct winsize w;
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-	Summarizer summarizer(delimiters, (int) w.ws_col);
+	winsize w;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); //FIXME: this returns an error code that must be checked
 
+	Summarizer summarizer(delimiters, (std::size_t) w.ws_col);
 	if(optind >= argc)
 	{
 		// no directory given as an argument, so check for a list of filenames from stdin
@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 			std::exit(EXIT_FAILURE);
 		}
 
-		struct dirent* ent;
+		dirent* ent;
 		while((ent = readdir(dir)) != NULL)
 		{
 			summarizer.inputFilename(ent -> d_name);

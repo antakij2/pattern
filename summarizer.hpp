@@ -12,7 +12,7 @@
 class Summarizer
 {
 	public:
-		Summarizer(const char*, int);
+		Summarizer(const char*, std::size_t);
 		void inputFilename(const char*);
 		void printSummary();
 	private:
@@ -36,24 +36,24 @@ class Summarizer
 				T* string;
 				std::size_t stringLength;
 				std::size_t capacity;
-				std::size_t* strlenPointer;
+				std::size_t* stringLengthPointer;
 		};
 
 		struct GraphemeClusterString
 		{
-			GraphemeClusterString(const char*, std::size_t, std::size_t); 
+			GraphemeClusterString(const uint8_t*, std::size_t, std::size_t);
 
 			const uint8_string string;
 			const std::size_t graphemeClusterCount;
 		};
 
-		static constexpr auto graphemeClusterStringComp = [](const GraphemeClusterString& lhs, const GraphemeClusterString& rhs) { return lhs.string < rhs.string; };
+        static bool graphemeClusterStringComp (const GraphemeClusterString& lhs, const GraphemeClusterString& rhs) { return lhs.string < rhs.string; }
 
 		std::size_t greatestCommonChunkIndex;
 		std::size_t patternIndex; 
-		int colLimit;
-		const std::set<uint8_string> delimiters;
-		std::vector<std::set<GraphemeClusterString, decltype(graphemeClusterStringComp)>> pattern; 
+		std::size_t colLimit;
+		std::set<uint8_string> delimiters;
+		std::vector<std::set<GraphemeClusterString, decltype(graphemeClusterStringComp)*>> pattern;
 		std::vector<std::size_t> highestGraphemeClusterCounts;
 		uint8_string scratch;
 		const char* localeCode;
