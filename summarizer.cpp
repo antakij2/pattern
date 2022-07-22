@@ -1,4 +1,5 @@
 #include <clocale>
+#include <cstring>
 #include <cstdlib>
 #include <cstdio>
 #include <uniconv.h>
@@ -7,19 +8,19 @@
 #include "summarizer.hpp"
 
 Summarizer::Summarizer(const char* _delimiters, int colLimit) :
-			greatestCommonChunkIndex(std::SIZE_MAX),
+			greatestCommonChunkIndex(SIZE_MAX),
 			patternIndex(0),
 			colLimit(colLimit)
 {
 	std::setlocale(LC_ALL, "");
         localeCode = locale_charset();
 
-	if(_delimiters == NULL)
+	if(_delimiters != NULL)
 	{
 		ingestString(_delimiters);
-		const uint8_t* graphemeBreaks = getGraphemeClusterBreaks();
-		const uint8_t* processedDelimiters = getProcessedString();
-		std::size_t processedDelimitersLength = getProcessedStringLength();
+		const char* graphemeBreaks = charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity();
+		const uint8_t* processedDelimiters = utf8BufferOuter.getWriteableStringDoesNotUpdateStringLengthOrCapacity();
+		std::size_t processedDelimitersLength = utf8BufferOuter.getStringLength();
 
 		std::size_t first = 0;
 		std::size_t last = 1;
@@ -40,9 +41,9 @@ Summarizer::Summarizer(const char* _delimiters, int colLimit) :
 void Summarizer::inputFilename(const char* filename)
 {
 	ingestString(filename);
-	const uint8_t* graphemeBreaks = getGraphemeClusterBreaks();
-	const uint8_t* processedFilename = getProcessedString();
-	std::size_t processedFilenameLength = getProcessedStringLength();
+	const char* graphemeBreaks = charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity();
+	const uint8_t* processedFilename = utf8BufferOuter.getWriteableStringDoesNotUpdateStringLengthOrCapacity();
+	std::size_t processedFilenameLength = utf8BufferOuter.getStringLength();
 
 	patternIndex = 0;
 	std::size_t first = 0;
@@ -52,7 +53,7 @@ void Summarizer::inputFilename(const char* filename)
 
 	//TODO:
 	// Either filename[last] is a delimiter, or there are no delimiters - meaning each character 
-	// is considered separately. Either way, the substring denoted by [first, last) will 
+	// is considered separately. Either way, the substring denoted by [_utf8BufferInner, last) will
 	// be put into a column, and then filename[last] will be in the next column, by itself.
 	for(; last < processedFilenameLength; ++last) 
 	{
@@ -119,16 +120,17 @@ void Summarizer::printSummary()
 		{
 			if(chunkIterator != chunkEnd)
 			{
-				result = u8_conv_to_encoding(localeCode, 
-						iconveh_question_mark, 
-						chunkIterator -> string.data(), 
-						chunkIterator -> string.size(), 
-						NULL, 
-						(char*) first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), //FIXME: these casts back and forth might be incorrect?
-						first.giveCapacityGetStrlen());
-				checkResult((uint8_t*) result, first); //TODO: technically not necessary?
+				result = u8_conv_to_encoding(localeCode,
+                                             iconveh_question_mark,
+                                             chunkIterator -> string.data(),
+                                             chunkIterator -> string.size(),
+                                             NULL,
+                                             charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
+                                             charBuffer.giveCapacityGetStringLength());
+				checkResult(result, charBuffer); //TODO: technically not necessary?
 
-				outputRowIterator -> append((char*) first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), first.getStrlen());
+				outputRowIterator -> append(charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
+                                            charBuffer.getStringLength());
 				outputRowIterator -> append(' ', highestGraphemeClusterCounts[i] - (chunkIterator -> graphemeClusterCount));
 
 				++chunkIterator;
@@ -158,25 +160,31 @@ void Summarizer::ingestString(const char* filename)
 {
 	uint8_t* result;
 
-	result = u8_conv_from_encoding(localeCode, iconveh_question_mark, filename, strlen(filename), NULL, first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), first.giveCapacityGetStrlen());
-	checkResult(result, first);
+	result = u8_conv_from_encoding(localeCode, iconveh_question_mark, filename, strlen(filename), NULL,
+                                   _utf8BufferInner.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
+                                   _utf8BufferInner.giveCapacityGetStringLength());
+	checkResult(result, _utf8BufferInner);
 
-	result = u8_normalize(UNINORM_NFC, first.getWriteableStringDoesNotUpdateStrlenOrCapacity(), first.getStrlen(), second.getWriteableStringDoesNotUpdateStrlenOrCapacity(), second.giveCapacityGetStrlen());
-	checkResult(result, second);
+	result = u8_normalize(UNINORM_NFC, _utf8BufferInner.getWriteableStringDoesNotUpdateStringLengthOrCapacity(), _utf8BufferInner.getStringLength(),
+                          utf8BufferOuter.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
+                          utf8BufferOuter.giveCapacityGetStringLength());
+	checkResult(result, utf8BufferOuter);
 
-	std::size_t secondStrlen = second.getStrlen();
-	*(first.giveCapacityGetStrlen()) = secondStrlen;
-	if(first.getCapacity() < secondStrlen)
+    // manually make sure that the char buffer into which the grapheme breaks will be recorded is big enough
+    std::size_t outerStringLength = utf8BufferOuter.getStringLength();
+	*(_utf8BufferInner.giveCapacityGetStringLength()) = outerStringLength;
+	if(_utf8BufferInner.getCapacity() < outerStringLength)
 	{
-		result = std::malloc(sizeof(*(first.getWriteableStringDoesNotUpdateStrlenOrCapacity())) * secondStrlen);
-		checkResult(result, first);
+		char* graphemeBreaksResult = (char*) std::malloc(sizeof(*(charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity())) * outerStringLength);
+		checkResult(graphemeBreaksResult, charBuffer);
 	}
-	u8_grapheme_breaks(second.getWriteableStringDoesNotUpdateStrlenOrCapacity(), secondStrlen, (char*) first.getWriteableStringDoesNotUpdateStrlenOrCapacity()); //FIXME: this (char*) cast is not guarenteed correct?
+	u8_grapheme_breaks(utf8BufferOuter.getWriteableStringDoesNotUpdateStringLengthOrCapacity(), outerStringLength, charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity());
 }
 
-void Summarizer::checkResult(const uint8_t* result, SmartUTF8Buffer& smartString) 
+template <class T>
+void Summarizer::checkResult(T* result, SmartBuffer<T>& smartString)
 {
-	if(result != smartString.getWriteableStringDoesNotUpdateStrlenOrCapacity())
+	if(result != smartString.getWriteableStringDoesNotUpdateStringLengthOrCapacity())
 	{
 		//TODO: add filename logging for non-malloc errors, so can print "these filenames could not be processed:" at end
 		if(result == NULL)
@@ -207,13 +215,14 @@ void Summarizer::insertInNextColumn(const uint8_t* str, std::size_t start, std::
 	++patternIndex;
 }
 
-Summarizer::SmartUTF8Buffer::SmartUTF8Buffer() :
-	strlen(0),
-	capacity(UTF8_FILENAME_MAX),
-	strlenPointer(&strlen)
+template <class T>
+Summarizer::SmartBuffer<T>::SmartBuffer() :
+        stringLength(0),
+        capacity(UTF8_FILENAME_MAX),
+        strlenPointer(&stringLength)
 
 {
-	string = (uint8_t*) std::malloc(sizeof(*string) * capacity);
+	string = (T*) std::malloc(sizeof(*string) * capacity);
 	if(ptr == NULL)
         {
                 std::perror(NULL);
@@ -221,20 +230,23 @@ Summarizer::SmartUTF8Buffer::SmartUTF8Buffer() :
         }
 }
 
-std::size_t* Summarizer::SmartUTF8Buffer::giveCapacityGetStrlen()
+template <class T>
+std::size_t* Summarizer::SmartBuffer<T>::giveCapacityGetStringLength()
 {
-	strlen = capacity;
+    stringLength = capacity;
 	return strlenPointer;
 }
 
-void Summarizer::SmartUTF8Buffer::reset(const uint8_t* other)
+template <class T>
+void Summarizer::SmartBuffer<T>::reset(T* other)
 {
 	std::free(string);
 	string = other;
-	capacity = strlen;
+	capacity = stringLength;
 }
 
-Summarizer::SmartUTF8Buffer::~SmartUTF8Buffer()
+template <class T>
+Summarizer::SmartBuffer<T>::~SmartBuffer()
 {
 	std::free(string);	
 }
