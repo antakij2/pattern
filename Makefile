@@ -1,7 +1,9 @@
-INVOKE_COMMON = g++ -Og
-INVOKE_COMPILE = $(INVOKE_COMMON) -g -std=c++11 -c
-OBJECTS = main.o summarizer.o
+#TODO: add "install" phony target
 EXECUTABLE = pattern
+OBJECTS = main.o summarizer.o
+#TODO: add -O3 when done debugging
+INVOKE_COMMON = g++
+INVOKE_COMPILE = $(INVOKE_COMMON) -g -std=c++11 -c
 
 .PHONY: clean
 
