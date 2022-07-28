@@ -1,20 +1,34 @@
-#TODO: add "install" phony target
 EXECUTABLE = pattern
 OBJECTS = main.o summarizer.o
-#TODO: add -O3 when done debugging
-INVOKE_COMMON = g++
-INVOKE_COMPILE = $(INVOKE_COMMON) -g -std=c++11 -c
 
-.PHONY: clean
+OPTIMIZATION_FLAG = -O3
+DEBUG_FLAG =
 
-$(EXECUTABLE): $(OBJECTS)
-	$(INVOKE_COMMON) $(OBJECTS) -o $(EXECUTABLE) -lunistring
+debug: OPTIMIZATION_FLAG =
+debug: DEBUG_FLAG = -g
+
+INVOKE_COMMON = g++ $(OPTIMIZATION_FLAG)
+INVOKE_COMPILE = $(INVOKE_COMMON) $(DEBUG_FLAG) -std=c++11 -c
+INVOKE_LINK = $(INVOKE_COMMON) $(OBJECTS) -o $(EXECUTABLE) -l unistring
+
+.PHONY: all debug install clean
+
+all: $(OBJECTS)
+	$(INVOKE_LINK)
+
+debug: $(OBJECTS)
+	$(INVOKE_LINK)
+
+install:
+	cp -i $(EXECUTABLE) /usr/local/bin
+
+clean:
+	rm -f $(OBJECTS) $(EXECUTABLE)
+
+
 
 main.o: main.cpp summarizer.hpp
 	$(INVOKE_COMPILE) main.cpp
 
 summarizer.o: summarizer.cpp summarizer.hpp
 	$(INVOKE_COMPILE) summarizer.cpp
-
-clean:
-	rm -f $(OBJECTS) $(EXECUTABLE)

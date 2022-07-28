@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <cstdio>
-#include <sys/ioctl.h>
 #include <unistd.h>
 #include <dirent.h>
 #include "summarizer.hpp"
@@ -25,17 +24,21 @@ int main(int argc, char* argv[])
 				//TODO
 				break;
 			case 'd': 
-				delimiters = optarg; //TODO: i think this is safe, even if the arguments get permuted??? 
+				delimiters = optarg; //TODO: is this safe if the arguments get permuted?
 				break;
 			default:
 				printUsageAndExit(argv);
 		}
 	}
 
+    /*TODO:
+    #include <sys/ioctl.h>
 	winsize w;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); //FIXME: this returns an error code that must be checked
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &w); //TODO: this returns an error code that must be checked
+    (w.ws_col)
+    */
 
-	Summarizer summarizer(delimiters, (std::size_t) w.ws_col);
+	Summarizer summarizer(delimiters);
 	if(optind >= argc)
 	{
 		// no directory given as an argument, so check for a list of filenames from stdin
@@ -57,6 +60,7 @@ int main(int argc, char* argv[])
 		dirent* ent;
 		while((ent = readdir(dir)) != NULL)
 		{
+            //TODO: ignore '.' and '..' in directory
 			summarizer.inputFilename(ent -> d_name);
 		}
 

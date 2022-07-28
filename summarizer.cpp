@@ -1,13 +1,12 @@
 #include <clocale>
 #include <cstring>
-#include <cstdlib>
 #include <cstdio>
 #include <uniconv.h>
 #include <uninorm.h>
 #include <unigbrk.h>
 #include "summarizer.hpp"
 
-Summarizer::Summarizer(const char* _delimiters, std::size_t colLimit) :
+Summarizer::Summarizer(const char* _delimiters, int colLimit) :
 			greatestCommonChunkIndex(SIZE_MAX),
 			patternIndex(0),
 			colLimit(colLimit)
@@ -49,35 +48,48 @@ void Summarizer::inputFilename(const char* filename)
 	std::size_t first = 0;
 	std::size_t prev = 0;
 	std::size_t last = 1;
-	std::size_t graphemeClusterCount = -1;
+	std::size_t graphemeClusterCount = 0; //specifically, the number of grapheme clusters in [first, prev)
 
-	//TODO:
-	// Either filename[last] is a delimiter, or there are no delimiters - meaning each character 
-	// is considered separately. Either way, the substring denoted by [_utf8BufferInner, last) will
-	// be put into a column, and then filename[last] will be in the next column, by itself.
-	for(; last < processedFilenameLength; ++last) 
+	for(; last < processedFilenameLength; ++last)
 	{
 		if(graphemeBreaks[last])
 		{
-			++graphemeClusterCount;
-
 			if(delimiters.empty() || delimiters.count(scratch.assign(processedFilename + prev, last - prev)))
 			{
-				if(first != prev) 
+				if(first != prev)
 				{
 					insertInNextColumn(processedFilename, first, prev, graphemeClusterCount);
 				}
 				insertInNextColumn(processedFilename, prev, last, 1);
 
 				first = last;
-				graphemeClusterCount = -1;
+				graphemeClusterCount = SIZE_MAX; // intentionally causing overflow on next increment of graphemeClusterCount
 			}
 
 			prev = last;
-		}
+            ++graphemeClusterCount;
+        }
 	}
 
-	insertInNextColumn(processedFilename, first, processedFilenameLength, 1);
+    if(first == prev)
+    {
+        // all characters preceding "prev" have already been processed, so just take care of what's in [prev, last)
+        insertInNextColumn(processedFilename, prev, last, 1);
+    }
+    else
+    {
+        // "delimiters" is not empty, and no characters in [first, prev) are delimiters
+
+        if(delimiters.count(scratch.assign(processedFilename + prev, last - prev)))
+        {
+            insertInNextColumn(processedFilename, first, prev, graphemeClusterCount);
+            insertInNextColumn(processedFilename, prev, last, 1);
+        }
+        else
+        {
+            insertInNextColumn(processedFilename, first, last, graphemeClusterCount + 1);
+        }
+    }
 
 	if(patternIndex < greatestCommonChunkIndex)
 	{
@@ -133,7 +145,7 @@ void Summarizer::printSummary()
                                             charBuffer.getStringLength());
 				outputRowIterator -> append(highestGraphemeClusterCounts[i] - (chunkIterator -> graphemeClusterCount), ' ');
 
-				++chunkIterator;
+                ++chunkIterator;
 			}
 			else
 			{
@@ -148,8 +160,7 @@ void Summarizer::printSummary()
 	}
 
 	// print out the pattern summary, keeping in mind the column limit of the user's terminal
-	// FIXME: keep in mind the column limit of the user's terminal. ulc_grapheme_breaks to know where to break this text?
-	std::printf("\n");
+	// TODO: keep in mind the column limit of the user's terminal. ulc_grapheme_breaks to know where to break this text?
 	for(auto it=output.begin(); it != output.end(); ++it)
 	{
 		printf("%s\n", it -> data());
@@ -206,7 +217,7 @@ void Summarizer::insertInNextColumn(const uint8_t* str, std::size_t start, std::
 		highestGraphemeClusterCounts.push_back(0);
 	}
 
-	pattern[patternIndex].emplace(str + start, start - end, graphemeClusterCount);
+	pattern[patternIndex].emplace(str + start, end - start, graphemeClusterCount);
 	if(graphemeClusterCount > highestGraphemeClusterCounts[patternIndex])
 	{
 		highestGraphemeClusterCounts[patternIndex] = graphemeClusterCount;
@@ -243,12 +254,6 @@ void Summarizer::SmartBuffer<T>::reset(T* other)
 	std::free(string);
 	string = other;
 	capacity = stringLength;
-}
-
-template <class T>
-Summarizer::SmartBuffer<T>::~SmartBuffer()
-{
-	std::free(string);	
 }
 
 Summarizer::GraphemeClusterString::GraphemeClusterString(const uint8_t* s, std::size_t n, std::size_t graphemeClusterCount) :

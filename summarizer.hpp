@@ -1,6 +1,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 #include <set>
 #include <string>
@@ -12,7 +13,7 @@
 class Summarizer
 {
 	public:
-		Summarizer(const char*, std::size_t);
+		Summarizer(const char*, int=-1);
 		void inputFilename(const char*);
 		void printSummary();
 	private:
@@ -28,7 +29,7 @@ class Summarizer
 				std::size_t getStringLength() { return stringLength; }
 				std::size_t* giveCapacityGetStringLength();
 				void reset(T*);
-				~SmartBuffer();
+				~SmartBuffer() { std::free(string); }
 			private:
 				// estimated maximum length of a POSIX filename transcoded to UTF-8, since UTF-8 characters are 1-4 bytes long
 				static const std::size_t UTF8_FILENAME_MAX = FILENAME_MAX * 4;
@@ -51,7 +52,7 @@ class Summarizer
 
 		std::size_t greatestCommonChunkIndex;
 		std::size_t patternIndex; 
-		std::size_t colLimit;
+		int colLimit;
 		std::set<uint8_string> delimiters;
 		std::vector<std::set<GraphemeClusterString, decltype(graphemeClusterStringComp)*>> pattern;
 		std::vector<std::size_t> highestGraphemeClusterCounts;
