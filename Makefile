@@ -13,11 +13,11 @@ INVOKE_LINK = $(INVOKE_COMMON) $(OBJECTS) -o $(EXECUTABLE) -l unistring
 
 .PHONY: all debug install clean
 
-all: $(OBJECTS)
-	$(INVOKE_LINK)
+all: $(EXECUTABLE)
+	
 
-debug: $(OBJECTS)
-	$(INVOKE_LINK)
+debug: $(EXECUTABLE)
+	
 
 install:
 	cp -i $(EXECUTABLE) /usr/local/bin
@@ -26,6 +26,9 @@ clean:
 	rm -f $(OBJECTS) $(EXECUTABLE)
 
 
+
+$(EXECUTABLE): $(OBJECTS)
+	$(INVOKE_LINK)
 
 main.o: main.cpp summarizer.hpp
 	$(INVOKE_COMPILE) main.cpp
