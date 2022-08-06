@@ -1,6 +1,6 @@
 /*
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-* pattern: Summarizes the pattern of a list of filenames by slicing each one into     *
+* pattern: Summarizes the pattern in a group of filenames by slicing each one into    *
 *          substrings, grouping together the Nth substrings from every filename, and  *
 *          printing the unique substrings found in each of the N groups.              *
 * Copyright (C) 2022  Joe Antaki  ->  joeantaki3 at gmail dot com                     *
@@ -25,6 +25,7 @@
 #include <uniconv.h>
 #include <uninorm.h>
 #include <unigbrk.h>
+#include <uniwidth.h>
 #include "summarizer.hpp"
 
 Summarizer::Summarizer(const char* _delimiters) :
@@ -72,7 +73,6 @@ void Summarizer::inputFilename(const char* filename)
 	std::size_t first = 0; // the start of the current substring under inspection, which has not yet been added to the pattern
 	std::size_t prev = 0; // the start of the current grapheme cluster under inspection, which has not yet been added to the pattern
 	std::size_t last = 1; // the end of the current grapheme cluster (and substring) under inspection, which has not yet been added to the pattern
-	std::size_t graphemeClusterCount = 0; // the number of grapheme clusters in [first, prev)
 
     // iterate over every byte in the processed filename...
 	for(; last < processedFilenameLength; ++last)
@@ -90,39 +90,28 @@ void Summarizer::inputFilename(const char* filename)
                 // the current delimiter [prev, last) to the following column
 				if(first != prev)
 				{
-					insertInNextColumn(processedFilename, first, prev, graphemeClusterCount);
+					insertInNextColumn(processedFilename, first, prev);
 				}
-				insertInNextColumn(processedFilename, prev, last, 1);
-
+				insertInNextColumn(processedFilename, prev, last);
+				//TODO: could encountering two delimiters in a row be presented better, e.g. create a new column right there for
+				// the second delimiter in a row and push the subsequent columns over by one? (make pattern a list)
 				first = last;
-				graphemeClusterCount = SIZE_MAX; // intentionally causing overflow on next increment of graphemeClusterCount
 			}
 
 			prev = last;
-            ++graphemeClusterCount;
         }
 	}
 
-    if(first == prev)
+    if(first != prev && delimiters.count(scratch.assign(processedFilename + prev, last - prev)))
     {
-        // all characters preceding "prev" have already been processed, so just take care of what's in [prev, last)
-        insertInNextColumn(processedFilename, prev, last, 1);
+        // [prev, last) is a delimiter, so it is entered into the pattern separately after [first, prev)
+        insertInNextColumn(processedFilename, first, prev);
+        insertInNextColumn(processedFilename, prev, last);
     }
     else
     {
-        // "delimiters" is not empty, and no characters in [first, prev) are delimiters
-
-        if(delimiters.count(scratch.assign(processedFilename + prev, last - prev)))
-        {
-            // [prev, last) is a delimiter, so enter it into the pattern separately from the substring [first, prev)
-            insertInNextColumn(processedFilename, first, prev, graphemeClusterCount);
-            insertInNextColumn(processedFilename, prev, last, 1);
-        }
-        else
-        {
-            // [prev, last) is not a delimiter, so enter [first, last) into the pattern as a single substring
-            insertInNextColumn(processedFilename, first, last, graphemeClusterCount + 1);
-        }
+        // [prev, last) is not a delimiter, so enter [first, last) into the pattern as a single substring
+        insertInNextColumn(processedFilename, first, last);
     }
 
 	if(patternIndex < greatestCommonChunkIndex)
@@ -178,13 +167,13 @@ void Summarizer::printSummary()
 
 				outputRowIterator -> append(charBuffer.getWriteableStringDoesNotUpdateStringLengthOrCapacity(),
                                             charBuffer.getStringLength());
-				outputRowIterator -> append(highestGraphemeClusterCounts[i] - (chunkIterator -> graphemeClusterCount), ' ');
+				outputRowIterator -> append(highestWidths[i] - (chunkIterator -> width), ' ');
 
                 ++chunkIterator;
 			}
 			else
 			{
-				outputRowIterator -> append(highestGraphemeClusterCounts[i], ' ');
+				outputRowIterator -> append(highestWidths[i], ' ');
 			}
 
 			if(i != patternSize - 1)
@@ -252,19 +241,22 @@ void Summarizer::checkResult(T* result, SmartBuffer<T>& smartString)
 	}
 }
 
-void Summarizer::insertInNextColumn(const uint8_t* str, std::size_t start, std::size_t end, std::size_t graphemeClusterCount)
+void Summarizer::insertInNextColumn(const uint8_t* str, std::size_t start, std::size_t end)
 {
 	if(pattern.size() == patternIndex)
 	{
 		// create a new column (set) in the pattern
-		pattern.emplace_back(graphemeClusterStringComp);
-		highestGraphemeClusterCounts.push_back(0);
+        pattern.emplace_back(displayWidthStringComp);
+		highestWidths.push_back(0);
 	}
 
-	pattern[patternIndex].emplace(str + start, end - start, graphemeClusterCount);
-	if(graphemeClusterCount > highestGraphemeClusterCounts[patternIndex])
+    const uint8_t* stringPointer = str + start;
+    std::size_t length = end - start;
+    int width = u8_width(stringPointer, length, localeCode);
+	pattern[patternIndex].emplace(stringPointer, length, width);
+	if(width > highestWidths[patternIndex])
 	{
-		highestGraphemeClusterCounts[patternIndex] = graphemeClusterCount;
+        highestWidths[patternIndex] = width;
 	}
 
 	++patternIndex;
@@ -301,7 +293,7 @@ void Summarizer::SmartBuffer<T>::reset(T* other)
 	capacity = stringLength;
 }
 
-Summarizer::GraphemeClusterString::GraphemeClusterString(const uint8_t* s, std::size_t n, std::size_t graphemeClusterCount) :
+Summarizer::DisplayWidthString::DisplayWidthString(const uint8_t* s, std::size_t n, int width) :
 	string(s, n),
-	graphemeClusterCount(graphemeClusterCount)
+	width(width)
 {}

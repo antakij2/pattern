@@ -1,6 +1,6 @@
 /*
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-* pattern: Summarizes the pattern of a list of filenames by slicing each one into     *
+* pattern: Summarizes the pattern in a group of filenames by slicing each one into    *
 *          substrings, grouping together the Nth substrings from every filename, and  *
 *          printing the unique substrings found in each of the N groups.              *
 * Copyright (C) 2022  Joe Antaki  ->  joeantaki3 at gmail dot com                     *
@@ -19,9 +19,6 @@
 * along with this program.  If not, see <https://www.gnu.org/licenses/>.              *
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 */
-//TODO: better handling for multiple delimiters in a row/different numbers of columns in a filename; display "outlier"
-// columns (columns that not all filenames have) in a way that makes them not confusing, no matter where they occur in
-// the pattern
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>

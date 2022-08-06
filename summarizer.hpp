@@ -1,6 +1,6 @@
 /*
 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-* pattern: Summarizes the pattern of a list of filenames by slicing each one into     *
+* pattern: Summarizes the pattern in a group of filenames by slicing each one into    *
 *          substrings, grouping together the Nth substrings from every filename, and  *
 *          printing the unique substrings found in each of the N groups.              *
 * Copyright (C) 2022  Joe Antaki  ->  joeantaki3 at gmail dot com                     *
@@ -130,31 +130,31 @@ class Summarizer
 		};
 
         /*
-         * Holds an STL string of utf-8 characters, along with the number of grapheme clusters in that string.
+         * Holds a std::string of utf-8 characters, along with the number of columns that string takes up on a terminal
+         * screen (assuming a monospace font).
          */
-		struct GraphemeClusterString
+		struct DisplayWidthString
 		{
             /*
-             * Construct a GraphemeClusterString object.
-             * @param s the source buffer of uint8_t from which to construct the STL string
-             * @param n the number of uint8_t characters to include in the STL string, starting from the position
+             * Construct a DisplayWidthString object.
+             * @param s the source buffer of uint8_t from which to construct the std::string
+             * @param n the number of uint8_t characters to include in the std::string, starting from the position
              *        pointed to by s
-             * @param graphemeClusterCount the number of grapheme clusters (a.k.a. user-perceived characters) in
-             *        the STL string
+             * @param width the number of columns required to display the string on a terminal
              */
-			GraphemeClusterString(const uint8_t* s, std::size_t n, std::size_t graphemeClusterCount);
+			DisplayWidthString(const uint8_t* s, std::size_t n, int width);
 
 			const uint8_string string;
-			const std::size_t graphemeClusterCount;
+			const int width;
 		};
 
         /*
-         * A comparison function for objects of type GraphemeClusterString. Compares the STL strings held by each object.
-         * @param lhs the first GraphemeClusterString object
-         * @param rhs the second GraphemeClusterString object
-         * @return true if lhs's STL string comes lexicographically before rhs's STL string; false otherwise.
+         * A comparison function for objects of type DisplayWidthString. Compares the std::strings held by each object.
+         * @param lhs the first DisplayWidthString object
+         * @param rhs the second DisplayWidthString object
+         * @return true if lhs's std::string comes lexicographically before rhs's std::string; false otherwise.
          */
-        static bool graphemeClusterStringComp (const GraphemeClusterString& lhs, const GraphemeClusterString& rhs)
+        static bool displayWidthStringComp (const DisplayWidthString& lhs, const DisplayWidthString& rhs)
         {
             return lhs.string < rhs.string;
         }
@@ -166,19 +166,19 @@ class Summarizer
         std::size_t patternIndex;
 
         /* sequence of N sets, each one holding the unique Nth substrings of all ingested filenames */
-		std::vector<std::set<GraphemeClusterString, decltype(graphemeClusterStringComp)*>> pattern;
+		std::vector<std::set<DisplayWidthString, decltype(displayWidthStringComp)*>> pattern; //TODO: make std::forward_list
 
-        /* tracks the highest number of grapheme clusters of any substring in a set, for all sets in pattern.
+        /* tracks the highest display width of any substring in a set, for all sets in pattern.
            Used to pad a set's substrings with spaces when printing out the pattern */
-		std::vector<std::size_t> highestGraphemeClusterCounts;
+		std::vector<int> highestWidths;
 
         int colLimit; /* the number of columns in the user's terminal */
         std::set<uint8_string> delimiters; /* normalized, utf-8 encoded version of the delimiters passed into the Summarizer object*/
-        uint8_string scratch; /* extra STL string used in determining when a delimiter is encountered in filenames */
+        uint8_string scratch; /* extra std::string used in determining when a delimiter is encountered in filenames */
 		const char* localeCode; /* libunistring-recognized code for the user's locale */
 		SmartBuffer<uint8_t> _utf8BufferInner; /* scratch buffer used when ingesting filenames */
 		SmartBuffer<uint8_t> utf8BufferOuter; /* buffer that contains utf-8 encoded, normalized filenames */
-		SmartBuffer<char> charBuffer; /* used to locate grapheme clusters in filenames, and to output the pattern in the user's locale */
+		SmartBuffer<char> charBuffer; /* used to locate grapheme clusters in filenames, and to encode the pattern's substrings in the user's locale */
 
         /*
          * Helper function for Summarizer::ingestFilename.
@@ -200,13 +200,12 @@ class Summarizer
 
         /*
          * Adds the next substring of the currently-being-ingested filename to the next set in the pattern, and
-         * records the number of grapheme clusters in the substring.
+         * records the string's display width.
          * @param str the character buffer to take a substring of
          * @param start where the substring in str begins (inclusive)
          * @param end where the substring in str ends (exclusive)
-         * @param graphemeClusterCount the number of grapheme clusters (a.k.a. user-perceived characters) in the substring
          */
-		void insertInNextColumn(const uint8_t* str, std::size_t start, std::size_t end, std::size_t graphemeClusterCount);
+		void insertInNextColumn(const uint8_t* str, std::size_t start, std::size_t end);
 };
 
 #endif /* SUMMARIZER_H */
