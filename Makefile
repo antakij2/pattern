@@ -1,37 +1,31 @@
+PREFIX = /usr/local/bin/
+
 EXECUTABLE = pattern
 OBJECTS = main.o summarizer.o
 
 OPTIMIZATION_FLAG = -O3
 DEBUG_FLAG =
+CXXFLAGS = $(OPTIMIZATION_FLAG) $(DEBUG_FLAG)
 
-debug: OPTIMIZATION_FLAG =
-debug: DEBUG_FLAG = -g
+.SUFFIXES: .cpp
+.cpp.o:
+	$(CXX) $(CXXFLAGS) -std=c++11 -c $<
 
-INVOKE_COMMON = g++ $(OPTIMIZATION_FLAG)
-INVOKE_COMPILE = $(INVOKE_COMMON) $(DEBUG_FLAG) -std=c++11 -c
-INVOKE_LINK = $(INVOKE_COMMON) $(OBJECTS) -o $(EXECUTABLE) -l unistring
-
-.PHONY: all debug install clean
+.PHONY: all install uninstall clean
 
 all: $(EXECUTABLE)
-	
-
-debug: $(EXECUTABLE)
-	
 
 install:
-	cp -i $(EXECUTABLE) /usr/local/bin
+	cp -i $(EXECUTABLE) $(PREFIX)
+
+uninstall:
+	rm $(PREFIX)$(EXECUTABLE)
 
 clean:
 	rm -f $(OBJECTS) $(EXECUTABLE)
 
-
-
 $(EXECUTABLE): $(OBJECTS)
-	$(INVOKE_LINK)
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(EXECUTABLE) -l unistring
 
 main.o: main.cpp summarizer.hpp
-	$(INVOKE_COMPILE) main.cpp
-
 summarizer.o: summarizer.cpp summarizer.hpp
-	$(INVOKE_COMPILE) summarizer.cpp
